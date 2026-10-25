@@ -64,7 +64,7 @@ describe('lib-adapter', () => {
     it('returns initial |00⟩ state for Bell circuit', () => {
       const circuit = buildBell();
       const lib = toLib(circuit);
-      const states = libStateVector(lib);
+      const states = libStateVector(lib, circuit);
       
       // Should have initial state + 2 steps
       expect(states.length).toBeGreaterThan(0);
@@ -86,7 +86,7 @@ describe('lib-adapter', () => {
     it('computes steps for Grover-3', () => {
       const circuit = buildGrover(3, '111');
       const lib = toLib(circuit);
-      const states = libStateVector(lib);
+      const states = libStateVector(lib, circuit);
       
       // Should have initial state + 11 steps (steps 0-10)
       expect(states.length).toBeGreaterThan(0);

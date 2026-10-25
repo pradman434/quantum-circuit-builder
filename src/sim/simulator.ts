@@ -100,7 +100,7 @@ export function stepStates(circuit: CircuitModel): SimulationResult {
   // Circuit is within the simulation cap. Convert to library format and simulate.
   try {
     const qc = toLib(circuit);
-    const rawStates = libStateVector(qc);
+    const rawStates = libStateVector(qc, circuit);
 
     // Convert library output to our StepState format
     const states: StepState[] = rawStates.map((amplitudes, index) => ({
