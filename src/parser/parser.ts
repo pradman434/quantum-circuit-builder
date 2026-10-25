@@ -62,7 +62,7 @@ const ALGORITHMS: AlgorithmDef[] = [
     keywords: ["bell"],
     label: "Bell state",
     defaultQubits: 2,
-    build: (qubits: number) => buildBell()
+    build: (_qubits: number) => buildBell()
   }
 ];
 

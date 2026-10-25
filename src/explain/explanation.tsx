@@ -15,8 +15,9 @@
  * and the currently active step for the step-through feature.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import type { CircuitModel } from '../model/circuit-model.js';
+import { useEffect, useRef, useState } from 'react';
+import type { JSX } from 'react';
+import type { CircuitModel, Gate } from '../model/circuit-model.js';
 import type { StepState } from '../sim/simulator.js';
 
 /**
@@ -85,21 +86,6 @@ const LEARN_MORE_URLS: Record<string, string | undefined> = {
   grover: undefined,  // PM to supply
   bell: undefined     // PM to supply
 };
-
-/**
- * Checks if KaTeX is available and working.
- * This is how we detect the degraded-mode condition.
- */
-function isKaTeXAvailable(): boolean {
-  try {
-    // Attempt to import KaTeX - if it fails, we're in degraded mode
-    // In production, this would be a dynamic import check
-    // For now, we check if the module is loadable
-    return typeof window !== 'undefined' && 'katex' in window;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Renders a mathematical expression using KaTeX if available, or raw text otherwise.
@@ -183,15 +169,16 @@ function formatStateVector(amplitudes: Array<{ basis: string; re: number; im: nu
 }
 
 /**
- * Gets the gate at the current active step, if any.
+ * Gets ALL gates in the currently active column.
+ *
+ * Step indexing is shared with the circuit diagram: `activeStep` is the
+ * 0-based COLUMN index, and the diagram highlights the same column. A column
+ * can hold several gates that act at the same time (e.g. H on q0, q1 and q2
+ * simultaneously in Grover), so this returns every gate whose step matches —
+ * not just the first — so the explanation describes what the diagram shows.
  */
-function getActiveGate(circuit: CircuitModel, activeStep: number) {
-  // activeStep 0 = initial state (no gate yet)
-  // activeStep i = state after step i-1
-  if (activeStep === 0) return null;
-  
-  const stepIndex = activeStep - 1;
-  return circuit.gates.find(g => g.step === stepIndex);
+function getActiveGates(circuit: CircuitModel, activeStep: number): Gate[] {
+  return circuit.gates.filter(g => g.step === activeStep);
 }
 
 /**
@@ -206,9 +193,14 @@ export function ExplanationPanel({ circuit, states, activeStep }: ExplanationPan
   
   const learnMoreUrl = LEARN_MORE_URLS[circuit.algorithmId];
   const isUnavailable = 'unavailable' in states && states.unavailable;
-  
-  // Get current gate (if activeStep > 0)
-  const activeGate = getActiveGate(circuit, activeStep);
+
+  // All gates in the active column (shared 0-based column index with the diagram).
+  const activeGates = getActiveGates(circuit, activeStep);
+
+  // The state vector AFTER this column. states[0] is the initial |0…0⟩ state and
+  // states[i+1] is the state after column i, so the post-column state is index activeStep + 1.
+  const postState =
+    Array.isArray(states) && states[activeStep + 1] ? states[activeStep + 1] : null;
   
   return (
     <div style={{ 
@@ -242,22 +234,33 @@ export function ExplanationPanel({ circuit, states, activeStep }: ExplanationPan
         </section>
       )}
       
-      {/* Gate matrix and state (Phase 2 - when states are available) */}
-      {!isUnavailable && activeGate && (
+      {/* Gates in this column + the state after it (Phase 2 - when states are available) */}
+      {!isUnavailable && activeGates.length > 0 && (
         <section style={{ marginTop: '20px' }}>
-          <h3>Step {activeStep}: {activeGate.name.toUpperCase()} gate</h3>
-          
-          {GATE_MATRIX[activeGate.name] && (
-            <div>
-              <h4>Gate Matrix</h4>
-              <MathDisplay 
-                latex={GATE_MATRIX[activeGate.name].latex}
-                plain={GATE_MATRIX[activeGate.name].plain}
-              />
-            </div>
-          )}
-          
-          {Array.isArray(states) && states[activeStep] && (
+          <h3>
+            Step {activeStep + 1}:{' '}
+            {activeGates.map(g => g.name.toUpperCase()).join(', ')}
+          </h3>
+
+          {activeGates.map((gate, i) => {
+            const matrix = GATE_MATRIX[gate.name];
+            const qubitDesc =
+              gate.controls.length > 0
+                ? `controls q${gate.controls.join(', q')} → target q${gate.targets.join(', q')}`
+                : `on q${gate.targets.join(', q')}`;
+            return (
+              <div key={`${gate.step}-${gate.name}-${i}`} style={{ marginTop: i === 0 ? 0 : '15px' }}>
+                <h4>
+                  {gate.name.toUpperCase()} gate <span style={{ fontWeight: 'normal', color: '#555' }}>({qubitDesc})</span>
+                </h4>
+                {matrix && (
+                  <MathDisplay latex={matrix.latex} plain={matrix.plain} />
+                )}
+              </div>
+            );
+          })}
+
+          {postState && (
             <div style={{ marginTop: '15px' }}>
               <h4>State after this step</h4>
               <pre style={{ 
@@ -268,15 +271,15 @@ export function ExplanationPanel({ circuit, states, activeStep }: ExplanationPan
                 borderRadius: '4px',
                 overflowX: 'auto'
               }}>
-                {formatStateVector(states[activeStep].amplitudes)}
+                {formatStateVector(postState.amplitudes)}
               </pre>
             </div>
           )}
         </section>
       )}
       
-      {/* Initial state display when at step 0 */}
-      {!isUnavailable && activeStep === 0 && Array.isArray(states) && states[0] && (
+      {/* Initial state display when at the first column with no gates (defensive) */}
+      {!isUnavailable && activeGates.length === 0 && Array.isArray(states) && states[0] && (
         <section style={{ marginTop: '20px' }}>
           <h3>Initial State</h3>
           <pre style={{ 

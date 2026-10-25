@@ -204,7 +204,7 @@ describe('ExplanationPanel', () => {
   });
 
   describe('Gate matrix and state display', () => {
-    it('shows initial state at step 0', () => {
+    it('describes the first gate column at activeStep 0 (shared indexing with the diagram)', () => {
       render(
         <ExplanationPanel
           circuit={groverCircuit}
@@ -213,30 +213,46 @@ describe('ExplanationPanel', () => {
         />
       );
 
-      // Should show "Initial State" heading
-      expect(screen.getByText('Initial State')).toBeInTheDocument();
-      
-      // Should show the |000⟩ state (initial state for 3 qubits)
-      expect(screen.getByText(/\|000⟩/)).toBeInTheDocument();
+      // activeStep 0 = column 0 = the three H gates (same column the diagram highlights).
+      // Heading is 1-based for humans: "Step 1".
+      expect(screen.getByText(/Step 1:/i)).toBeInTheDocument();
+
+      // Shows the state AFTER this column (states[1] = superposition), not the initial state.
+      expect(screen.getByText('State after this step')).toBeInTheDocument();
+      // Superposition includes |001⟩ (a non-initial basis state), proving it's the post-column state.
+      const stateDisplay = screen.getByText('State after this step').parentElement;
+      expect(stateDisplay?.textContent).toMatch(/\|001⟩/);
     });
 
-    it('shows gate information at step > 0', () => {
+    it('describes ALL gates in the active column, not just the first', () => {
       render(
         <ExplanationPanel
           circuit={groverCircuit}
+          states={mockStates}
+          activeStep={0}
+        />
+      );
+
+      // Grover column 0 has THREE H gates (on q0, q1, q2). The explanation must
+      // describe every one — the old code showed only the first.
+      const hGateHeadings = screen.getAllByText(/H gate/i);
+      expect(hGateHeadings.length).toBe(3);
+    });
+
+    it('describes the matching gate at a later column (regression: no off-by-one)', () => {
+      render(
+        <ExplanationPanel
+          circuit={bellCircuit}
           states={mockStates}
           activeStep={1}
         />
       );
 
-      // Should show gate step heading
-      expect(screen.getByText(/Step 1: H gate/i)).toBeInTheDocument();
-      
-      // Should show "Gate Matrix" heading
-      expect(screen.getByText('Gate Matrix')).toBeInTheDocument();
-      
-      // Should show "State after this step" heading
-      expect(screen.getByText('State after this step')).toBeInTheDocument();
+      // bellCircuit column 1 is the CX gate. The explanation must describe CX —
+      // NOT the H from column 0 (the original bug: diagram CCX, explanation H).
+      expect(screen.getByText(/Step 2:/i)).toBeInTheDocument();
+      expect(screen.getByText(/CX gate/i)).toBeInTheDocument();
+      expect(screen.queryByText(/^H gate/i)).not.toBeInTheDocument();
     });
 
     it('does not show gate info when states are unavailable', () => {
@@ -278,7 +294,7 @@ describe('ExplanationPanel', () => {
         <ExplanationPanel
           circuit={groverCircuit}
           states={mockStates}
-          activeStep={1}
+          activeStep={0}
         />
       );
 
@@ -291,7 +307,13 @@ describe('ExplanationPanel', () => {
       
       // Component should still be functional
       expect(screen.getByText('What this algorithm does')).toBeInTheDocument();
-      expect(screen.getByText('Gate Matrix')).toBeInTheDocument();
+      // Per-gate matrix headers are rendered (the old single 'Gate Matrix' heading
+      // was replaced by one header per gate in the column). The header text is split
+      // across a name node and a description span, so match on the element's content.
+      const gateHeaders = screen.getAllByText(
+        (_content, el) => el?.tagName === 'H4' && /gate/i.test(el.textContent ?? '')
+      );
+      expect(gateHeaders.length).toBeGreaterThan(0);
     });
   });
 
@@ -315,12 +337,12 @@ describe('ExplanationPanel', () => {
         <ExplanationPanel
           circuit={groverCircuit}
           states={mockStates}
-          activeStep={1}
+          activeStep={0}
         />
       );
 
-      // After Hadamard on all qubits, should show superposition
-      // The formatted text should contain multiple basis states
+      // Column 0 is the three Hadamards; the state AFTER it (states[1]) is the
+      // equal superposition over all 8 basis states.
       const stateDisplay = screen.getByText(/State after this step/i).parentElement;
       expect(stateDisplay?.textContent).toMatch(/\|000⟩/);
       expect(stateDisplay?.textContent).toMatch(/\|001⟩/);
