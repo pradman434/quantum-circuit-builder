@@ -11,6 +11,8 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@types/katex": "^0.16.8",
+    "katex": "^0.19.1",
     "quantum-circuit": "^0.9.251",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
