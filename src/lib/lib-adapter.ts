@@ -119,21 +119,63 @@ export function libToQasm(qc: QuantumCircuit): string {
 /**
  * Computes the state vector at each step of the circuit.
  * 
- * The library can run statevector simulation. We execute the circuit
- * incrementally to get the state after each column (step).
+ * Strategy: For each step, build a fresh partial circuit from the original CircuitModel
+ * (not from the library's internal structure), including only gates up to that step,
+ * then run() and extract the state. This avoids dealing with the library's complex
+ * internal gate storage.
  * 
  * Returns an array where index i is the state after step i.
  * Index 0 is the initial |0...0⟩ state.
  * 
- * @param qc - Library's QuantumCircuit object
+ * NOTE: The quantastica/quantum-circuit library stores state amplitudes as
+ * objects with {re, im} fields, NOT as [real, imag] arrays.
+ * 
+ * IMPORTANT: This function is meant to be called from simulator.ts which has access
+ * to the original CircuitModel. To make this work, we need to pass the CircuitModel
+ * alongside the QuantumCircuit, OR refactor to build partial circuits in toLib.
+ * 
+ * For now, we'll extract step information from the library circuit itself by
+ * running it incrementally using a different strategy: run the FULL circuit once,
+ * then for each earlier step, rebuild from scratch with gates filtered by step.
+ * 
+ * @param qc - Library's QuantumCircuit object (the FULL circuit)
+ * @param circuit - Our CircuitModel (needed to filter by step)
  * @returns Array of state vectors (complex amplitudes)
  */
-export function libStateVector(qc: QuantumCircuit): Array<{ basis: string; re: number; im: number }[]> {
+function libStateVectorFromModel(qc: QuantumCircuit, circuit: CircuitModel): Array<{ basis: string; re: number; im: number }[]> {
   const steps: Array<{ basis: string; re: number; im: number }[]> = [];
-  const numQubits = qc.numQubits;
+  const numQubits = circuit.numQubits;
   const numStates = 1 << numQubits; // 2^numQubits
 
-  // Initial state |0...0⟩
+  // Helper: extract state from a quantum circuit
+  const extractState = (circuit: QuantumCircuit): { basis: string; re: number; im: number }[] => {
+    const stateArray: { basis: string; re: number; im: number }[] = [];
+    const state = circuit.state;
+    
+    for (let i = 0; i < numStates; i++) {
+      const basis = i.toString(2).padStart(numQubits, '0');
+      const amplitude = state[i];
+      
+      if (amplitude && typeof amplitude === 'object' && 're' in amplitude && 'im' in amplitude) {
+        stateArray.push({
+          basis,
+          re: amplitude.re,
+          im: amplitude.im
+        });
+      } else {
+        // If state is missing or malformed, assume zero amplitude
+        stateArray.push({
+          basis,
+          re: 0,
+          im: 0
+        });
+      }
+    }
+    
+    return stateArray;
+  };
+
+  // Initial state |0...0⟩ (before any gates)
   const initialState: { basis: string; re: number; im: number }[] = [];
   for (let i = 0; i < numStates; i++) {
     const basis = i.toString(2).padStart(numQubits, '0');
@@ -145,46 +187,32 @@ export function libStateVector(qc: QuantumCircuit): Array<{ basis: string; re: n
   }
   steps.push(initialState);
 
-  // Run simulation step by step
-  // The library's statevector is in qc.state after calling run()
-  // We need to clone and run incrementally
-  for (let col = 0; col < qc.numCols(); col++) {
-    const partialQC = new QuantumCircuit(numQubits);
-    
-    // Copy gates up to and including this column
-    for (let c = 0; c <= col; c++) {
-      const column = qc.gates[c];
-      if (!column) continue;
-      for (let qubit = 0; qubit < numQubits; qubit++) {
-        const gateData = column[qubit];
-        if (gateData) {
-          // Re-add this gate to the partial circuit
-          // Use the library's internal structure
-          if (!partialQC.gates[c]) {
-            partialQC.gates[c] = {};
-          }
-          partialQC.gates[c][qubit] = JSON.parse(JSON.stringify(gateData));
-        }
-      }
-    }
+  // Find the maximum step index
+  const maxStep = Math.max(...circuit.gates.map(g => g.step));
 
-    // Run simulation on this partial circuit
+  // For each step from 0 to maxStep, build a partial circuit and simulate
+  for (let targetStep = 0; targetStep <= maxStep; targetStep++) {
+    // Build a partial CircuitModel with only gates up to targetStep
+    const partialModel: CircuitModel = {
+      ...circuit,
+      gates: circuit.gates.filter(g => g.step <= targetStep)
+    };
+
+    // Convert to library format and run
+    const partialQC = toLib(partialModel);
     partialQC.run();
-    
-    // Extract state vector
-    const stateArray: { basis: string; re: number; im: number }[] = [];
-    const state = partialQC.state;
-    for (let i = 0; i < numStates; i++) {
-      const basis = i.toString(2).padStart(numQubits, '0');
-      const amplitude = state[i] || [0, 0]; // [real, imag]
-      stateArray.push({
-        basis,
-        re: amplitude[0],
-        im: amplitude[1]
-      });
-    }
-    steps.push(stateArray);
+
+    // Extract and store state
+    steps.push(extractState(partialQC));
   }
 
   return steps;
+}
+
+/**
+ * Public API: libStateVector that accepts BOTH the library circuit and our model.
+ * This is what simulator.ts will call.
+ */
+export function libStateVector(qc: QuantumCircuit, circuit: CircuitModel): Array<{ basis: string; re: number; im: number }[]> {
+  return libStateVectorFromModel(qc, circuit);
 }
