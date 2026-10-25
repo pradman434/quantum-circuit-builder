@@ -342,8 +342,8 @@ if __name__ == "__main__":
         "ghz": ghz_states
     }
     
-    with open("golden-states.json", "w") as f:
+    with open("src/sim/__tests__/fixtures/golden-states.json", "w") as f:
         json.dump(output, f, indent=2)
     
-    print(f"\nGolden state vectors saved to golden-states.json")
+    print(f"\nGolden state vectors saved to src/sim/__tests__/fixtures/golden-states.json")
     print(f"Generated using: Pure Python analytic calculation (explicit gate matrices)")
