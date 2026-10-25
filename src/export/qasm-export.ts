@@ -16,7 +16,6 @@
  */
 
 import type { CircuitModel } from '../model/circuit-model';
-import { toLib, libToQasm } from '../lib/lib-adapter';
 
 /**
  * Exports a circuit to OpenQASM 2.0 format.
@@ -37,15 +36,9 @@ import { toLib, libToQasm } from '../lib/lib-adapter';
  * @throws Never - all validation is done before export
  */
 export function toQasm2(circuit: CircuitModel): string {
-  // Convert to library format and generate QASM
-  const qc = toLib(circuit);
-  const rawQasm = libToQasm(qc);
-
-  // Post-filter to guarantee qelib1.inc-only output
-  // The library should already produce valid QASM, but we ensure:
-  // 1. Required headers are present
-  // 2. Format is standardized
-  // 3. Gate names match qelib1.inc vocabulary
+  // QASM is generated deterministically from the canonical circuit model
+  // (gates sorted by step, then target) to guarantee qelib1.inc-only output
+  // with stable ordering.
 
   const lines: string[] = [];
 

@@ -15,7 +15,7 @@
  * All rendering logic is self-contained here.
  */
 
-import React from 'react';
+import type { JSX } from 'react';
 import type { CircuitModel, Gate } from '../model/circuit-model';
 
 /**
@@ -261,7 +261,7 @@ export function CircuitDiagram({ circuit, activeStep }: CircuitDiagramProps): JS
       })}
       
       {/* Gates */}
-      {gates.map((gate, idx) => renderGate(gate, gate.step))}
+      {gates.map((gate) => renderGate(gate, gate.step))}
     </svg>
   );
 }

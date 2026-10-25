@@ -1,9 +1,12 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Served from https://pradman434.github.io/quantum-circuit-builder/ (GitHub Project Pages subpath)
+  base: '/quantum-circuit-builder/',
   plugins: [
     react(),
     VitePWA({
@@ -18,7 +21,7 @@ export default defineConfig({
         theme_color: '#1976d2',
         icons: [
           {
-            src: '/vite.svg',
+            src: 'favicon.svg',
             sizes: '192x192',
             type: 'image/svg+xml'
           }

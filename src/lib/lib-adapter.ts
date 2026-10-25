@@ -12,6 +12,7 @@
  */
 
 import QuantumCircuit from 'quantum-circuit';
+import type { QuantumCircuit as QuantumCircuitType } from 'quantum-circuit';
 import type { CircuitModel, Gate } from '../model/circuit-model';
 
 /**
@@ -23,7 +24,7 @@ import type { CircuitModel, Gate } from '../model/circuit-model';
  * @param circuit - Our canonical circuit model
  * @returns QuantumCircuit object ready for library operations
  */
-export function toLib(circuit: CircuitModel): QuantumCircuit {
+export function toLib(circuit: CircuitModel): QuantumCircuitType {
   const qc = new QuantumCircuit(circuit.numQubits);
 
   // Group gates by step to maintain time ordering
@@ -88,7 +89,7 @@ export function toLib(circuit: CircuitModel): QuantumCircuit {
  * @param qc - Library's QuantumCircuit object
  * @returns Our canonical circuit model (simplified)
  */
-export function fromLib(qc: QuantumCircuit): CircuitModel {
+export function fromLib(qc: QuantumCircuitType): CircuitModel {
   // For Phase 1, we don't actually need full round-trip from lib format
   // This will be properly implemented in Phase 3 (QASM import)
   
@@ -112,7 +113,7 @@ export function fromLib(qc: QuantumCircuit): CircuitModel {
  * @param qc - Library's QuantumCircuit object
  * @returns OpenQASM 2.0 string
  */
-export function libToQasm(qc: QuantumCircuit): string {
+export function libToQasm(qc: QuantumCircuitType): string {
   return qc.exportQASM();
 }
 
@@ -142,13 +143,13 @@ export function libToQasm(qc: QuantumCircuit): string {
  * @param circuit - Our CircuitModel (needed to filter by step)
  * @returns Array of state vectors (complex amplitudes)
  */
-function libStateVectorFromModel(qc: QuantumCircuit, circuit: CircuitModel): Array<{ basis: string; re: number; im: number }[]> {
+function libStateVectorFromModel(_qc: QuantumCircuitType, circuit: CircuitModel): Array<{ basis: string; re: number; im: number }[]> {
   const steps: Array<{ basis: string; re: number; im: number }[]> = [];
   const numQubits = circuit.numQubits;
   const numStates = 1 << numQubits; // 2^numQubits
 
   // Helper: extract state from a quantum circuit
-  const extractState = (circuit: QuantumCircuit): { basis: string; re: number; im: number }[] => {
+  const extractState = (circuit: QuantumCircuitType): { basis: string; re: number; im: number }[] => {
     const stateArray: { basis: string; re: number; im: number }[] = [];
     const state = circuit.state;
     
@@ -213,6 +214,6 @@ function libStateVectorFromModel(qc: QuantumCircuit, circuit: CircuitModel): Arr
  * Public API: libStateVector that accepts BOTH the library circuit and our model.
  * This is what simulator.ts will call.
  */
-export function libStateVector(qc: QuantumCircuit, circuit: CircuitModel): Array<{ basis: string; re: number; im: number }[]> {
+export function libStateVector(qc: QuantumCircuitType, circuit: CircuitModel): Array<{ basis: string; re: number; im: number }[]> {
   return libStateVectorFromModel(qc, circuit);
 }
