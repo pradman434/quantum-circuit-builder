@@ -1,0 +1,4 @@
+# Independent OpenQASM 2.0 parser used by CI to validate exporter output.
+# Pinned so the "independent validator" (HLD CRITICAL-1) is reproducible and
+# cannot silently drift to a parser version with different acceptance rules.
+qiskit==1.2.4
